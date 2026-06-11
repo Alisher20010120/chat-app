@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f0f10;
+            color: #e8e8e8;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* AUTH */
+        #auth-screen {
+            background: #1a1a1d;
+            border-radius: 16px;
+            padding: 40px;
+            width: 380px;
+            border: 1px solid #2a2a2e;
+        }
+
+        #auth-screen h2 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+
+        #auth-screen p {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 28px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: #aaa;
+            margin-bottom: 6px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 14px;
+            background: #0f0f10;
+            border: 1px solid #2a2a2e;
+            border-radius: 10px;
+            color: #e8e8e8;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            border-color: #5865f2;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 13px;
+            background: #5865f2;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 4px;
+        }
+
+        .btn-primary:hover { background: #4752c4; }
+
+        .auth-switch {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 13px;
+            color: #888;
+        }
+
+        .auth-switch span {
+            color: #5865f2;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .auth-switch span:hover { text-decoration: underline; }
+
+        .error-msg {
+            background: #3d1a1a;
+            border: 1px solid #7a2b2b;
+            color: #f87171;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        /* MAIN CHAT */
+        #chat-screen {
+            display: none;
+            width: 900px;
+            height: 90vh;
+            background: #1a1a1d;
+            border-radius: 16px;
+            border: 1px solid #2a2a2e;
+            overflow: hidden;
+            flex-direction: row;
+        }
+
+        /* SIDEBAR */
+        #sidebar {
+            width: 260px;
+            background: #141416;
+            border-right: 1px solid #2a2a2e;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px 16px;
+            border-bottom: 1px solid #2a2a2e;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-header h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .btn-icon {
+            background: #5865f2;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .btn-icon:hover { background: #4752c4; }
+
+        #room-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .room-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.15s;
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        .room-item:hover { background: #1e1e22; color: #fff; }
+        .room-item.active { background: #2a2a40; color: #fff; }
+
+        .room-icon {
+            width: 32px;
+            height: 32px;
+            background: #2a2a2e;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .room-item.active .room-icon { background: #5865f2; }
+
+        .sidebar-footer {
+            padding: 12px 16px;
+            border-top: 1px solid #2a2a2e;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .avatar {
+            width: 32px;
+            height: 32px;
+            background: #5865f2;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .username-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #e8e8e8;
+        }
+
+        .btn-logout {
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 4px;
+            transition: color 0.2s;
+        }
+
+        .btn-logout:hover { color: #f87171; }
+
+        /* CHAT AREA */
+        #chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #chat-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #2a2a2e;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #chat-header h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        #chat-header span {
+            font-size: 12px;
+            color: #888;
+        }
+
+        #join-btn {
+            margin-left: auto;
+            padding: 7px 16px;
+            background: #5865f2;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: none;
+        }
+
+        #join-btn:hover { background: #4752c4; }
+
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        #messages::-webkit-scrollbar { width: 4px; }
+        #messages::-webkit-scrollbar-thumb { background: #2a2a2e; border-radius: 2px; }
+
+        .msg {
+            display: flex;
+            flex-direction: column;
+            max-width: 65%;
+            gap: 2px;
+        }
+
+        .msg.mine { align-self: flex-end; align-items: flex-end; }
+        .msg.theirs { align-self: flex-start; align-items: flex-start; }
+
+        .msg-sender {
+            font-size: 11px;
+            color: #666;
+            padding: 0 4px;
+        }
+
+        .msg-bubble {
+            padding: 10px 14px;
+            border-radius: 14px;
+            font-size: 14px;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .msg.mine .msg-bubble {
+            background: #5865f2;
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+
+        .msg.theirs .msg-bubble {
+            background: #2a2a2e;
+            color: #e8e8e8;
+            border-bottom-left-radius: 4px;
+        }
+
+        .msg-time {
+            font-size: 10px;
+            color: #555;
+            padding: 0 4px;
+        }
+
+        .system-msg {
+            text-align: center;
+            font-size: 12px;
+            color: #555;
+            padding: 8px;
+        }
+
+        #input-area {
+            padding: 16px 20px;
+            border-top: 1px solid #2a2a2e;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #msg-input {
+            flex: 1;
+            padding: 12px 16px;
+            background: #0f0f10;
+            border: 1px solid #2a2a2e;
+            border-radius: 12px;
+            color: #e8e8e8;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #msg-input:focus { border-color: #5865f2; }
+        #msg-input:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        #send-btn {
+            width: 44px;
+            height: 44px;
+            background: #5865f2;
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+
+        #send-btn:hover { background: #4752c4; }
+        #send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* EMPTY STATE */
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #555;
+            gap: 12px;
+        }
+
+        .empty-state .icon { font-size: 48px; }
+        .empty-state p { font-size: 14px; }
+
+        /* MODAL */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .modal-overlay.open { display: flex; }
+
+        .modal {
+            background: #1a1a1d;
+            border: 1px solid #2a2a2e;
+            border-radius: 14px;
+            padding: 28px;
+            width: 340px;
+        }
+
+        .modal h3 {
+            font-size: 17px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-cancel {
+            flex: 1;
+            padding: 11px;
+            background: #2a2a2e;
+            border: none;
+            border-radius: 9px;
+            color: #aaa;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .btn-cancel:hover { background: #333; }
+
+        .btn-confirm {
+            flex: 1;
+            padding: 11px;
+            background: #5865f2;
+            border: none;
+            border-radius: 9px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .btn-confirm:hover { background: #4752c4; }
+    </style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+    <h2 id="auth-title">Kirish</h2>
+    <p id="auth-subtitle">Davom etish uchun tizimga kiring</p>
+    <div class="error-msg" id="auth-error"></div>
+    <div class="form-group">
+        <label>Foydalanuvchi nomi</label>
+        <input type="text" id="username" placeholder="username">
+    </div>
+    <div class="form-group">
+        <label>Parol</label>
+        <input type="password" id="password" placeholder="••••••">
+    </div>
+    <button class="btn-primary" onclick="handleAuth()">Kirish</button>
+    <div class="auth-switch">
+        Hisobingiz yo'qmi? <span onclick="toggleAuth()">Ro'yxatdan o'ting</span>
+    </div>
+</div>
+
+<!-- CHAT -->
+<div id="chat-screen">
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <h3>Xonalar</h3>
+            <button class="btn-icon" onclick="openCreateRoom()" title="Yangi xona">+</button>
+        </div>
+        <div id="room-list">
+            <div class="system-msg">Xonalar yuklanmoqda...</div>
+        </div>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="avatar" id="user-avatar">A</div>
+                <span class="username-label" id="current-username">-</span>
+            </div>
+            <button class="btn-logout" onclick="logout()" title="Chiqish">⏻</button>
+        </div>
+    </div>
+
+    <!-- Chat area -->
+    <div id="chat-area">
+        <div class="empty-state" id="empty-state">
+            <div class="icon">💬</div>
+            <p>Xona tanlang yoki yangi yarating</p>
+        </div>
+
+        <div id="active-chat" style="display:none; flex-direction:column; height:100%;">
+            <div id="chat-header">
+                <div class="room-icon" style="width:36px;height:36px;background:#2a2a2e;border-radius:8px;display:flex;align-items:center;justify-content:center;">💬</div>
+                <div>
+                    <h3 id="active-room-name">-</h3>
+                    <span id="connection-status">Ulanilmoqda...</span>
+                </div>
+                <button id="join-btn" onclick="joinCurrentRoom()">Qo'shilish</button>
+            </div>
+
+            <div id="messages"></div>
+
+            <div id="input-area">
+                <input type="text" id="msg-input" placeholder="Xabar yozing..." disabled
+                       onkeydown="if(event.key==='Enter') sendMessage()">
+                <button id="send-btn" onclick="sendMessage()" disabled>➤</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Room Modal -->
+<div class="modal-overlay" id="create-modal">
+    <div class="modal">
+        <h3>Yangi xona yaratish</h3>
+        <div class="form-group">
+            <label>Xona nomi</label>
+            <input type="text" id="new-room-name" placeholder="masalan: JavaDevelopers">
+        </div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeCreateRoom()">Bekor</button>
+            <button class="btn-confirm" onclick="createRoom()">Yaratish</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API = 'http://localhost:8080';
+    let token = localStorage.getItem('token');
+    let currentUser = localStorage.getItem('username');
+    let currentRoom = null;
+    let stompClient = null;
+    let currentSubscription = null; // ✅ Eski obunani saqlash uchun o'zgaruvchi
+    let isRegister = false;
+    let isInRoom = false;
+
+    // ─── AUTH ───────────────────────────────────────────
+    function toggleAuth() {
+        isRegister = !isRegister;
+        document.getElementById('auth-title').textContent = isRegister ? "Ro'yxatdan o'tish" : "Kirish";
+        document.getElementById('auth-subtitle').textContent = isRegister
+            ? "Yangi hisob yarating" : "Davom etish uchun tizimga kiring";
+        document.querySelector('.auth-switch').innerHTML = isRegister
+            ? 'Hisobingiz bormi? <span onclick="toggleAuth()">Kirish</span>'
+            : 'Hisobingiz yo\'qmi? <span onclick="toggleAuth()">Ro\'yxatdan o\'ting</span>';
+        document.querySelector('.btn-primary').textContent = isRegister ? "Ro'yxatdan o'tish" : "Kirish";
+        hideError();
+    }
+
+    async function handleAuth() {
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value.trim();
+        if (!username || !password) { showError("Maydonlarni to'ldiring"); return; }
+
+        const url = isRegister ? `${API}/auth/register` : `${API}/auth/login`;
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (!res.ok) { showError(data.message || "Xatolik yuz berdi"); return; }
+            token = data.token;
+            currentUser = username;
+            localStorage.setItem('token', token);
+            localStorage.setItem('username', username);
+            showChat();
+        } catch (e) {
+            showError("Server bilan aloqa yo'q");
+        }
+    }
+
+    function logout() {
+        localStorage.clear();
+        token = null; currentUser = null; currentRoom = null;
+        if (stompClient) stompClient.disconnect();
+        document.getElementById('chat-screen').style.display = 'none';
+        document.getElementById('auth-screen').style.display = 'block';
+        document.getElementById('username').value = '';
+        document.getElementById('password').value = '';
+    }
+
+    function showError(msg) {
+        const el = document.getElementById('auth-error');
+        el.textContent = msg; el.style.display = 'block';
+    }
+    function hideError() { document.getElementById('auth-error').style.display = 'none'; }
+
+    // ─── INIT ────────────────────────────────────────────
+    if (token) showChat();
+
+    async function showChat() {
+        document.getElementById('auth-screen').style.display = 'none';
+        const cs = document.getElementById('chat-screen');
+        cs.style.display = 'flex';
+        document.getElementById('current-username').textContent = currentUser;
+        document.getElementById('user-avatar').textContent = currentUser.charAt(0).toUpperCase();
+        await loadRooms();
+        connectWebSocket();
+    }
+
+    // ─── ROOMS ───────────────────────────────────────────
+    async function loadRooms() {
+        try {
+            const res = await fetch(`${API}/room/getAll`, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+
+            if (res.ok) {
+                const rooms = await res.json();
+                renderRooms(rooms);
+            } else {
+                console.error("Xonalarni yuklashda xatolik:", res.status);
+            }
+        } catch (e) {
+            console.error("Tarmoq xatoligi:", e);
+        }
+    }
+
+    function renderRooms(rooms) {
+        const list = document.getElementById('room-list');
+        if (!rooms.length) {
+            list.innerHTML = '<div class="system-msg">Hali xona yo\'q</div>';
+            return;
+        }
+        list.innerHTML = rooms.map(r => `
+            <div class="room-item ${currentRoom?.id === r.id ? 'active' : ''}" onclick="selectRoom(${JSON.stringify(r).replace(/"/g, '&quot;')})">
+              <div class="room-icon">💬</div>
+              <span>${r.roomName}</span>
+            </div>
+        `).join('');
+    }
+
+    async function selectRoom(room) {
+        currentRoom = room;
+        document.getElementById('empty-state').style.display = 'none';
+        document.getElementById('active-chat').style.display = 'flex';
+        document.getElementById('active-room-name').textContent = room.roomName;
+        document.getElementById('messages').innerHTML = '';
+
+        // Foydalanuvchi xonada bor yo'qligini tekshirish
+        const inRoom = room.users && room.users.some(u => u.username === currentUser);
+        isInRoom = inRoom;
+        document.getElementById('join-btn').style.display = inRoom ? 'none' : 'inline-block';
+        document.getElementById('msg-input').disabled = !inRoom;
+        document.getElementById('send-btn').disabled = !inRoom;
+
+        // Sidebar-da aktiv xonani belgilash
+        document.querySelectorAll('.room-item').forEach(el => el.classList.remove('active'));
+        if (window.event && window.event.currentTarget) {
+            window.event.currentTarget.classList.add('active');
+        }
+
+        // ✅ Eski xona obunasini o'chirish va yangisiga ulanish
+        if (stompClient && stompClient.connected) {
+            if (currentSubscription) {
+                currentSubscription.unsubscribe();
+            }
+            // Backend @SendTo("/topic/room.{roomId}") shaklida qaytaryapti
+            currentSubscription = stompClient.subscribe(`/topic/room.${room.id}`, onMessage);
+            document.getElementById('connection-status').textContent = "Ulangan";
+        }
+
+        // Xabarlar tarixini yuklash
+        await loadMessages(room.id);
+    }
+
+    async function loadMessages(roomId) {
+        try {
+            // ✅ URL TUZATILDI: /messages o'rniga /message qilindi
+            const res = await fetch(`${API}/message/${roomId}`, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (res.ok) {
+                const msgs = await res.json();
+                const container = document.getElementById('messages');
+                container.innerHTML = '';
+                msgs.forEach(m => {
+                    // Backend Entity tuzilishiga qarab m.sender?.username yoki m.user?.username
+                    const senderName = m.sender?.username || m.user?.username || 'Noma\'lum';
+                    appendMessage(senderName, m.content, m.createdAt);
+                });
+                scrollBottom();
+            }
+        } catch (e) {
+            console.error("Eski xabarlarni yuklashda xatolik:", e);
+        }
+    }
+
+    async function joinCurrentRoom() {
+        if (!currentRoom) return;
+        try {
+            const res = await fetch(`${API}/room/${currentRoom.id}/join`, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (res.ok) {
+                isInRoom = true;
+                document.getElementById('join-btn').style.display = 'none';
+                document.getElementById('msg-input').disabled = false;
+                document.getElementById('send-btn').disabled = false;
+                addSystemMsg(`Siz "${currentRoom.roomName}" xonasiga qo'shildingiz`);
+                await loadRooms();
+            }
+        } catch (e) {}
+    }
+
+    // ─── CREATE ROOM ─────────────────────────────────────
+    function openCreateRoom() { document.getElementById('create-modal').classList.add('open'); }
+    function closeCreateRoom() {
+        document.getElementById('create-modal').classList.remove('open');
+        document.getElementById('new-room-name').value = '';
+    }
+
+    async function createRoom() {
+        const name = document.getElementById('new-room-name').value.trim();
+        if (!name) return;
+        try {
+            const res = await fetch(`${API}/room/create`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ roomName: name })
+            });
+
+            if (res.ok) {
+                closeCreateRoom();
+                await loadRooms();
+            } else {
+                const errorData = await res.text();
+                console.error(`Xona yaratishda xatolik:`, errorData);
+            }
+        } catch (e) {
+            console.error("Tarmoq xatoligi:", e);
+        }
+    }
+
+    // ─── WEBSOCKET ───────────────────────────────────────
+    function connectWebSocket() {
+        const socket = new SockJS(`${API}/ws`);
+        stompClient = Stomp.over(socket);
+        stompClient.debug = null;
+
+        stompClient.connect(
+            { 'Authorization': 'Bearer ' + token },
+            function (frame) {
+                console.log('WebSocket-ga muvaffaqiyatli ulandi');
+
+                // 1. Aktiv xona bo'lsa unga ulanish
+                if (currentRoom) {
+                    if (currentSubscription) currentSubscription.unsubscribe();
+                    currentSubscription = stompClient.subscribe(`/topic/room.${currentRoom.id}`, onMessage);
+                    document.getElementById('connection-status').textContent = "Ulangan";
+                }
+
+                // 🔥 2. YANGILIK: Yangi guruhlar ochilishini eshitib turish (Hamma userlar uchun)
+                stompClient.subscribe('/topic/rooms.new', function (response) {
+                    const newRoom = JSON.parse(response.body);
+
+                    // Sahifani yangilamasdan, ro'yxatni qayta yuklaymiz
+                    loadRooms();
+
+                    // Yoki ekranga tizimli xabar chiqarish (ixtiyoriy)
+                    if(newRoom.createdBy !== currentUser) {
+                        console.log("Yangi xona qo'shildi: " + newRoom.roomName);
+                    }
+                });
+            },
+            function (error) {
+                console.error('WebSocket ulanishida xatolik:', error);
+                document.getElementById('connection-status').textContent = "Aloqa uzildi";
+            }
+        );
+    }
+    function onMessage(frame) {
+        const msg = JSON.parse(frame.body);
+        // Server qaytarayotgan Messages obyektiga ko'ra ssender tekshiriladi
+        const senderName = msg.sender?.username || msg.user?.username || 'Noma\'lum';
+        appendMessage(senderName, msg.content, msg.createdAt);
+        scrollBottom();
+    }
+
+    function sendMessage() {
+        const input = document.getElementById('msg-input');
+        const content = input.value.trim();
+        if (!content || !currentRoom || !stompClient?.connected) return;
+
+        stompClient.send(
+            `/app/chat.send/${currentRoom.id}`,
+            { 'Authorization': 'Bearer ' + token },
+            JSON.stringify({
+                content: content,
+                username: currentUser // 👈 Backendga kim yozayotganini ochiq yuboramiz
+            })
+        );
+        input.value = '';
+    }
+
+    // ─── UI HELPERS ──────────────────────────────────────
+    function appendMessage(sender, content, time) {
+        const container = document.getElementById('messages');
+        const isMine = sender === currentUser;
+        const timeStr = time ? new Date(time).toLocaleTimeString('uz', { hour: '2-digit', minute: '2-digit' }) : '';
+
+        const div = document.createElement('div');
+        div.className = `msg ${isMine ? 'mine' : 'theirs'}`;
+        div.innerHTML = `
+            ${!isMine ? `<div class="msg-sender">${sender}</div>` : ''}
+            <div class="msg-bubble">${escapeHtml(content)}</div>
+            <div class="msg-time">${timeStr}</div>
+        `;
+        container.appendChild(div);
+    }
+
+    function addSystemMsg(text) {
+        const container = document.getElementById('messages');
+        const div = document.createElement('div');
+        div.className = 'system-msg';
+        div.textContent = text;
+        container.appendChild(div);
+        scrollBottom();
+    }
+
+    function scrollBottom() {
+        const m = document.getElementById('messages');
+        m.scrollTop = m.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+</script>
+</body>
+</html>
